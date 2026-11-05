@@ -1,4 +1,4 @@
-const hal = @cImport(@cInclude("hal.h"));
+const arduino = @import("arduino");
 const std = @import("std");
 const types = @import("types.zig");
 const config = @import("config.zig");
@@ -13,7 +13,7 @@ pub fn writeConfig() void {
             if (i > 0) {
                 writeStr(",\n");
             }
-            const str = std.fmt.bufPrintZ(
+            const str = std.fmt.bufPrintSentinel(
                 &BUFFER,
                 "\"ScoreBoard.Settings.Setting(ScoreBoard.Operator.{s}.KeyControl.{s})\": \"{c}\"",
                 .{
@@ -21,6 +21,7 @@ pub fn writeConfig() void {
                     shortcut.crg,
                     shortcut.key,
                 },
+                0,
             ) catch "";
             writeStr(str);
         }
@@ -32,7 +33,7 @@ pub fn writeConfig() void {
 
 fn writeStr(str: []const u8) void {
     for (str) |c| {
-        hal.keyboardWrite(c);
-        hal.delay(1);
+        arduino.keyboardWrite(c);
+        arduino.delay(1);
     }
 }

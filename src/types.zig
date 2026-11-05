@@ -108,15 +108,15 @@ pub const ShortcutMapping = struct {
 };
 
 pub fn enumSize(T: type) usize {
-    return std.meta.fields(T).len;
+    return @typeInfo(T).@"enum".field_names.len;
 }
 
 pub fn enumList(T: type) [enumSize(T)]T {
-    const fields = std.meta.fields(T);
-    var res: [fields.len]T = undefined;
+    const values = @typeInfo(T).@"enum".field_values;
+    var res: [values.len]T = undefined;
 
-    inline for (fields, 0..) |f, i| {
-        res[i] = @enumFromInt(f.value);
+    inline for (values, 0..) |v, i| {
+        res[i] = @fromBackingInt(@intCast(v));
     }
 
     return res;

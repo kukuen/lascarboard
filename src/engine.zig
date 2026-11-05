@@ -11,9 +11,10 @@ pub const EngineState = struct {
         };
     }
 
-    pub fn update(self: *@This(), keys: types.KeyboardStatus) !std.BoundedArray(types.Action, types.enumSize(types.Action)) {
-        var triggeredActions = std.BoundedArray(types.Action, types.enumSize(types.Action)){};
-        var downActions = std.BoundedArray(types.Action, types.enumSize(types.Action)){};
+    pub fn update(self: *@This(), gpa: std.mem.Allocator, keys: types.KeyboardStatus) !std.ArrayList(types.Action) {
+        var triggeredActions: std.ArrayList(types.Action) = .empty;
+        var downActions: std.ArrayList(types.Action) = .empty;
+        defer downActions.deinit(gpa);
 
         var cancelActionDown = false;
 
@@ -25,7 +26,7 @@ pub const EngineState = struct {
             if (!isDown) {
                 self.currentState.setState(action, .off);
                 if (previousState == .on) {
-                    try triggeredActions.append(action);
+                    try triggeredActions.append(gpa, action);
                 }
             } else {
                 if (action == .cancel_all) {
@@ -36,27 +37,27 @@ pub const EngineState = struct {
                     self.currentState.setState(action, .cancelled);
                 }
 
-                try downActions.append(action);
+                try downActions.append(gpa, action);
             }
         }
 
         if (cancelActionDown or getDownCount(keys) >= config.CANCEL_COUNT) {
-            for (downActions.slice()) |action| {
+            for (downActions.items) |action| {
                 self.currentState.setState(action, .cancelled);
             }
         }
 
         // reseting state when all keys are up
         // (just in case I missed something)
-        if (downActions.slice().len == 0) {
+        if (downActions.items.len == 0) {
             self.currentState.reset();
             return triggeredActions;
         }
 
-        for (downActions.slice()) |a| {
+        for (downActions.items) |a| {
             const mappingA = config.ACTION_MAPPINGS.get(a) orelse continue;
             var hasConflict = false;
-            for (downActions.slice()) |b| {
+            for (downActions.items) |b| {
                 const mappingB = config.ACTION_MAPPINGS.get(b) orelse continue;
 
                 const diff = compareButtons(mappingA.buttons, mappingB.buttons);
@@ -159,14 +160,14 @@ fn compareButtons(aButtons: []const types.Button, bButtons: []const types.Button
     var only_in_b: u8 = 0;
 
     for (aButtons) |e| {
-        if (std.mem.containsAtLeastScalar(types.Button, bButtons, 1, e)) {
+        if (std.mem.containsAtLeastScalar(types.Button, bButtons, e, 1)) {
             common_buttons += 1;
         } else {
             only_in_a += 1;
         }
     }
     for (bButtons) |e| {
-        if (!std.mem.containsAtLeastScalar(types.Button, aButtons, 1, e)) {
+        if (!std.mem.containsAtLeastScalar(types.Button, aButtons, e, 1)) {
             only_in_b += 1;
         }
     }

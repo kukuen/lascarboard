@@ -1,4 +1,4 @@
-const hal = @cImport(@cInclude("hal.h"));
+const arduino = @import("arduino");
 
 const std = @import("std");
 const config = @import("config.zig");
@@ -19,15 +19,15 @@ var ENGINE_STATE: engine.EngineState = undefined;
 var LAST_KEY_COUNT: u8 = 0;
 var LAST_TIME: u32 = 0;
 
-pub export fn setup() callconv(.C) void {
-    hal.keyboardBegin();
+pub export fn setup() callconv(.c) void {
+    arduino.keyboardBegin();
 
     if (config.DEBUG_SERIAL) {
         // hal.serialBegin(9600);
         // hal.delay(5000);
     }
     if (config.DEBUG_LED) {
-        hal.pinMode(13, OUTPUT);
+        arduino.pinMode(13, OUTPUT);
     }
 
     ENGINE_STATE = engine.EngineState.init();
@@ -36,7 +36,7 @@ pub export fn setup() callconv(.C) void {
     inline for (types.BUTTONS) |button| {
         const pin = config.PIN_MAPPING.get(button);
         if (pin) |p| {
-            hal.pinMode(p, INPUT_PULLUP);
+            arduino.pinMode(p, INPUT_PULLUP);
         }
     }
 
@@ -46,7 +46,7 @@ pub export fn setup() callconv(.C) void {
 
     if (engine.getDownCount(keyboardStatus) >= config.KEYS_TO_WRITE_CONFIG) {
         // needed because keyboard isn't recognized right away
-        hal.delay(1000);
+        arduino.delay(1000);
         crg.writeConfig();
 
         while (engine.getDownCount(keyboardStatus) > 0) {
@@ -55,16 +55,20 @@ pub export fn setup() callconv(.C) void {
         }
     }
 
-    LAST_TIME = hal.micros();
+    LAST_TIME = @intCast(arduino.micros());
 }
 
-pub export fn loop() callconv(.C) void {
-    const now = hal.micros();
+pub export fn loop() callconv(.c) void {
+    var frame_allocator_buffer: [1024]u8 = undefined;
+    var frame_allocator = std.heap.FixedBufferAllocator.init(&frame_allocator_buffer);
+    const arena = frame_allocator.allocator();
+
+    const now: u32 = @intCast(arduino.micros());
     const delta: u32 = if (now < LAST_TIME) std.math.maxInt(u32) - LAST_TIME + now + 1 else now - LAST_TIME;
 
     if (config.DEBUG_SERIAL) {
         var buf: [50]u8 = undefined;
-        hal.serialPrintln(std.fmt.bufPrintZ(&buf, "delta = {d}", .{delta}) catch "");
+        arduino.serialPrintln(std.fmt.bufPrintZ(&buf, "delta = {d}", .{delta}) catch "");
     }
 
     LAST_TIME = now;
@@ -72,7 +76,7 @@ pub export fn loop() callconv(.C) void {
     inline for (types.BUTTONS) |button| {
         const pin = config.PIN_MAPPING.get(button);
         if (pin) |p| {
-            KEYBOARD_DEBOUNCER.getKey(button).update(hal.digitalRead(p) == 0, delta);
+            KEYBOARD_DEBOUNCER.getKey(button).update(arduino.digitalRead(p) == 0, delta);
         }
     }
 
@@ -81,7 +85,7 @@ pub export fn loop() callconv(.C) void {
     const newCount = engine.getDownCount(keyboardStatus);
 
     if (config.DEBUG_LED) {
-        hal.digitalWrite(13, if (newCount > 0) 1 else 0);
+        arduino.digitalWrite(13, if (newCount > 0) 1 else 0);
     }
 
     // if (config.DEBUG_SERIAL and newCount != LAST_KEY_COUNT) {
@@ -90,13 +94,13 @@ pub export fn loop() callconv(.C) void {
     //     hal.serialPrintln(std.fmt.bufPrintZ(&buf, "count = {d}", .{newCount}) catch "");
     // }
 
-    const actions = ENGINE_STATE.update(keyboardStatus) catch return;
+    const actions = ENGINE_STATE.update(arena, keyboardStatus) catch return;
 
-    for (actions.slice()) |action| {
+    for (actions.items) |action| {
         const key = config.SHORTCUTS.get(action);
         if (key) |k| {
-            hal.keyboardPress(k.key);
-            hal.keyboardRelease(k.key);
+            arduino.keyboardPress(k.key);
+            arduino.keyboardRelease(k.key);
         }
     }
 }
@@ -105,7 +109,7 @@ fn updateKeyboardStateRaw() void {
     inline for (types.BUTTONS) |button| {
         const pin = config.PIN_MAPPING.get(button);
         if (pin) |p| {
-            KEYBOARD_DEBOUNCER.getKey(button).state = hal.digitalRead(p) == 0;
+            KEYBOARD_DEBOUNCER.getKey(button).state = arduino.digitalRead(p) == 0;
         }
     }
 }
