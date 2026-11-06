@@ -65,6 +65,6 @@ zig build upload
 
 ## Hardware
 
-Wire the 10 buttons to the Arduino board according to `pin_mapping` in [config.zig](src/config.zig).
+Wire the 10 buttons to the Arduino board according to `arduino_pins.buttons` in [config.zig](src/config.zig).
 
 

@@ -11,10 +11,9 @@ pub const EngineState = struct {
         };
     }
 
-    pub fn update(self: *@This(), gpa: std.mem.Allocator, keys: types.KeyboardStatus) !std.ArrayList(types.Action) {
-        var triggered_actions: std.ArrayList(types.Action) = .empty;
-        var down_actions: std.ArrayList(types.Action) = .empty;
-        defer down_actions.deinit(gpa);
+    pub fn update(self: *@This(), keys: types.KeyboardStatus) types.SimpleBoundedArray(types.Action, types.all_actions.len) {
+        var triggered_actions: types.SimpleBoundedArray(types.Action, types.all_actions.len) = .empty;
+        var down_actions: types.SimpleBoundedArray(types.Action, types.all_actions.len) = .empty;
 
         var cancel_action_down = false;
 
@@ -26,7 +25,7 @@ pub const EngineState = struct {
             if (!is_down) {
                 self.current_state.setState(action, .off);
                 if (previous_state == .on) {
-                    try triggered_actions.append(gpa, action);
+                    triggered_actions.append(action);
                 }
             } else {
                 if (action == .cancel_all) {
@@ -37,27 +36,27 @@ pub const EngineState = struct {
                     self.current_state.setState(action, .cancelled);
                 }
 
-                try down_actions.append(gpa, action);
+                down_actions.append(action);
             }
         }
 
-        if (cancel_action_down or getDownCount(keys) >= config.cancel_count) {
-            for (down_actions.items) |action| {
+        if (cancel_action_down or getDownCount(keys) >= config.action_cancel_keys_down) {
+            for (down_actions.items()) |action| {
                 self.current_state.setState(action, .cancelled);
             }
         }
 
-        // reseting state when all keys are up
+        // resetting state when all keys are up
         // (just in case I missed something)
-        if (down_actions.items.len == 0) {
+        if (down_actions.items().len == 0) {
             self.current_state.reset();
             return triggered_actions;
         }
 
-        for (down_actions.items) |a| {
+        for (down_actions.items()) |a| {
             const mapping_a = config.actions_mapping.get(a) orelse continue;
             var has_conflict = false;
-            for (down_actions.items) |b| {
+            for (down_actions.items()) |b| {
                 const mappingB = config.actions_mapping.get(b) orelse continue;
 
                 const diff = compareButtons(mapping_a.buttons, mappingB.buttons);

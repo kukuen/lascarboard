@@ -69,7 +69,7 @@ pub const KeyDebouncer = struct {
             self.debounce_duration += delta;
         }
 
-        if (self.debounce_duration >= config.debounce_delay_micros) {
+        if (self.debounce_duration >= config.keys_debounce_delay_micros) {
             self.state = read;
         }
     }
@@ -106,3 +106,22 @@ pub const ShortcutMapping = struct {
     key: u8,
     crg: []const u8,
 };
+
+pub fn SimpleBoundedArray(comptime T: type, comptime len: usize) type {
+    return struct {
+        buffer: [len]T,
+        len: usize = 0,
+
+        pub const empty: @This() = .{ .buffer = undefined };
+
+        pub fn append(self: *@This(), e: T) void {
+            std.debug.assert(self.len < len);
+            self.buffer[self.len] = e;
+            self.len += 1;
+        }
+
+        pub fn items(self: *const @This()) []const T {
+            return self.buffer[0..self.len];
+        }
+    };
+}

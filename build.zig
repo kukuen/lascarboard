@@ -12,7 +12,7 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const optimize = std.builtin.Optimize.fast;
+    const optimize = std.builtin.Optimize.small;
 
     const root_module = b.createModule(.{
         .root_source_file = b.path("src/main.zig"),

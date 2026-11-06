@@ -10,15 +10,15 @@ pub fn writeConfig() void {
     writeStr("\"state\": {\n");
 
     for (types.all_actions, 0..) |action, i| {
-        if (config.crg_shortcuts.get(action)) |shortcut| {
+        if (config.crg.shortcuts.get(action)) |shortcut| {
             if (i > 0) {
                 writeStr(",\n");
             }
-            const str = std.fmt.bufPrintSentinel(
+            const str = std.mem.printSentinel(
                 &buffer,
                 "\"ScoreBoard.Settings.Setting(ScoreBoard.Operator.{s}.KeyControl.{s})\": \"{c}\"",
                 .{
-                    config.crg_operator,
+                    config.crg.operator,
                     shortcut.crg,
                     shortcut.key,
                 },
