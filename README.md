@@ -60,12 +60,11 @@ Combine a `[team]` button + 1 (or more) `[f]` buttons
 ## Building from source
 
 ```
-zig build
-pio run -t upload
+zig build upload
 ```
 
 ## Hardware
 
-Wire the 10 buttons to the Arduino board according to `PIN_MAPPING` in [config.zig](src/config.zig).
+Wire the 10 buttons to the Arduino board according to `pin_mapping` in [config.zig](src/config.zig).
 
 

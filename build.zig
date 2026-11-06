@@ -38,6 +38,9 @@ pub fn build(b: *std.Build) void {
 
     b.installArtifact(lib);
 
+    const pio_upload = b.addSystemCommand(&.{ "platformio", "run", "-t", "upload" });
+    pio_upload.step.dependOn(b.getInstallStep());
+
     const upload_step = b.step("upload", "Upload");
-    upload_step.dependOn(&b.addSystemCommand(&.{ "platformio", "run", "-t", "upload" }).step);
+    upload_step.dependOn(&pio_upload.step);
 }

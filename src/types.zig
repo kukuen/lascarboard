@@ -14,7 +14,7 @@ pub const Button = enum {
     f4,
 };
 
-pub const BUTTONS = enumList(Button);
+pub const all_buttons = std.enums.values(Button);
 
 pub const Action = enum {
     team1_trip_score_4,
@@ -52,24 +52,24 @@ pub const Action = enum {
     cancel_all,
 };
 
-pub const ACTIONS = enumList(Action);
+pub const all_actions = std.enums.values(Action);
 
 pub const KeyboardStatus = std.EnumArray(Button, bool);
 
 pub const KeyDebouncer = struct {
     state: bool = false,
-    lastRead: bool = false,
-    debounceDuration: u32 = 0,
+    last_read: bool = false,
+    debounce_duration: u32 = 0,
 
     pub fn update(self: *@This(), read: bool, delta: u32) void {
-        if (read != self.lastRead) {
-            self.debounceDuration = 0;
-            self.lastRead = read;
+        if (read != self.last_read) {
+            self.debounce_duration = 0;
+            self.last_read = read;
         } else if (read != self.state) {
-            self.debounceDuration += delta;
+            self.debounce_duration += delta;
         }
 
-        if (self.debounceDuration >= config.DEBOUNCE_DELAY_MICROS) {
+        if (self.debounce_duration >= config.debounce_delay_micros) {
             self.state = read;
         }
     }
@@ -90,7 +90,7 @@ pub const KeyboardDebouncer = struct {
 
     pub fn getKeyboardStatus(self: *const @This()) KeyboardStatus {
         var status = KeyboardStatus.initFill(false);
-        for (BUTTONS) |button| {
+        for (all_buttons) |button| {
             status.set(button, self.content.get(button).state);
         }
         return status;
@@ -106,18 +106,3 @@ pub const ShortcutMapping = struct {
     key: u8,
     crg: []const u8,
 };
-
-pub fn enumSize(T: type) usize {
-    return @typeInfo(T).@"enum".field_names.len;
-}
-
-pub fn enumList(T: type) [enumSize(T)]T {
-    const values = @typeInfo(T).@"enum".field_values;
-    var res: [values.len]T = undefined;
-
-    inline for (values, 0..) |v, i| {
-        res[i] = @fromBackingInt(@intCast(v));
-    }
-
-    return res;
-}

@@ -3,21 +3,22 @@ const std = @import("std");
 const types = @import("types.zig");
 const config = @import("config.zig");
 
-var BUFFER: [200]u8 = undefined;
+var buffer: [200]u8 = @splat(0);
+
 pub fn writeConfig() void {
     writeStr("{\n");
     writeStr("\"state\": {\n");
 
-    for (types.ACTIONS, 0..) |action, i| {
-        if (config.SHORTCUTS.get(action)) |shortcut| {
+    for (types.all_actions, 0..) |action, i| {
+        if (config.crg_shortcuts.get(action)) |shortcut| {
             if (i > 0) {
                 writeStr(",\n");
             }
             const str = std.fmt.bufPrintSentinel(
-                &BUFFER,
+                &buffer,
                 "\"ScoreBoard.Settings.Setting(ScoreBoard.Operator.{s}.KeyControl.{s})\": \"{c}\"",
                 .{
-                    config.CRG_OPERATOR,
+                    config.crg_operator,
                     shortcut.crg,
                     shortcut.key,
                 },
@@ -31,7 +32,7 @@ pub fn writeConfig() void {
     writeStr("}\n");
 }
 
-fn writeStr(str: []const u8) void {
+fn writeStr(str: [:0]const u8) void {
     for (str) |c| {
         arduino.keyboardWrite(c);
         arduino.delay(1);

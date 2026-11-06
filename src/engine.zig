@@ -3,84 +3,84 @@ const types = @import("types.zig");
 const config = @import("config.zig");
 
 pub const EngineState = struct {
-    currentState: ActionStates,
+    current_state: ActionStates,
 
     pub fn init() EngineState {
         return EngineState{
-            .currentState = ActionStates.init(),
+            .current_state = ActionStates.init(),
         };
     }
 
     pub fn update(self: *@This(), gpa: std.mem.Allocator, keys: types.KeyboardStatus) !std.ArrayList(types.Action) {
-        var triggeredActions: std.ArrayList(types.Action) = .empty;
-        var downActions: std.ArrayList(types.Action) = .empty;
-        defer downActions.deinit(gpa);
+        var triggered_actions: std.ArrayList(types.Action) = .empty;
+        var down_actions: std.ArrayList(types.Action) = .empty;
+        defer down_actions.deinit(gpa);
 
-        var cancelActionDown = false;
+        var cancel_action_down = false;
 
-        for (types.ACTIONS) |action| {
-            const mapping = config.ACTION_MAPPINGS.get(action) orelse continue;
-            const previousState = self.currentState.getState(action);
-            const isDown = isActionDown(keys, mapping);
+        for (types.all_actions) |action| {
+            const mapping = config.actions_mapping.get(action) orelse continue;
+            const previous_state = self.current_state.getState(action);
+            const is_down = isActionDown(keys, mapping);
 
-            if (!isDown) {
-                self.currentState.setState(action, .off);
-                if (previousState == .on) {
-                    try triggeredActions.append(gpa, action);
+            if (!is_down) {
+                self.current_state.setState(action, .off);
+                if (previous_state == .on) {
+                    try triggered_actions.append(gpa, action);
                 }
             } else {
                 if (action == .cancel_all) {
-                    cancelActionDown = true;
+                    cancel_action_down = true;
                 }
 
                 if (isExcludeDown(keys, mapping)) {
-                    self.currentState.setState(action, .cancelled);
+                    self.current_state.setState(action, .cancelled);
                 }
 
-                try downActions.append(gpa, action);
+                try down_actions.append(gpa, action);
             }
         }
 
-        if (cancelActionDown or getDownCount(keys) >= config.CANCEL_COUNT) {
-            for (downActions.items) |action| {
-                self.currentState.setState(action, .cancelled);
+        if (cancel_action_down or getDownCount(keys) >= config.cancel_count) {
+            for (down_actions.items) |action| {
+                self.current_state.setState(action, .cancelled);
             }
         }
 
         // reseting state when all keys are up
         // (just in case I missed something)
-        if (downActions.items.len == 0) {
-            self.currentState.reset();
-            return triggeredActions;
+        if (down_actions.items.len == 0) {
+            self.current_state.reset();
+            return triggered_actions;
         }
 
-        for (downActions.items) |a| {
-            const mappingA = config.ACTION_MAPPINGS.get(a) orelse continue;
-            var hasConflict = false;
-            for (downActions.items) |b| {
-                const mappingB = config.ACTION_MAPPINGS.get(b) orelse continue;
+        for (down_actions.items) |a| {
+            const mapping_a = config.actions_mapping.get(a) orelse continue;
+            var has_conflict = false;
+            for (down_actions.items) |b| {
+                const mappingB = config.actions_mapping.get(b) orelse continue;
 
-                const diff = compareButtons(mappingA.buttons, mappingB.buttons);
+                const diff = compareButtons(mapping_a.buttons, mappingB.buttons);
                 switch (diff) {
                     .identical, .distinct, .a_is_superset => {},
                     .conflict, .b_is_superset => {
-                        hasConflict = true;
+                        has_conflict = true;
                         break;
                     },
                 }
             }
 
-            if (hasConflict) {
-                self.currentState.setState(a, .cancelled);
+            if (has_conflict) {
+                self.current_state.setState(a, .cancelled);
             } else {
-                const current = self.currentState.getState(a);
+                const current = self.current_state.getState(a);
                 if (current == .off) {
-                    self.currentState.setState(a, .on);
+                    self.current_state.setState(a, .on);
                 }
             }
         }
 
-        return triggeredActions;
+        return triggered_actions;
     }
 };
 
@@ -138,7 +138,7 @@ pub fn isExcludeDown(status: types.KeyboardStatus, action: types.ActionMapping) 
 
 pub fn getDownCount(status: types.KeyboardStatus) u8 {
     var count: u8 = 0;
-    for (types.BUTTONS) |button| {
+    for (types.all_buttons) |button| {
         if (status.get(button)) {
             count += 1;
         }
@@ -270,17 +270,17 @@ test {
     try test_step(&state, .{}, &[_]types.Action{});
 }
 
-var testIdx: i32 = 0;
+var test_idx: i32 = 0;
 
 fn test_step(state: *EngineState, new_status: std.enums.EnumFieldStruct(types.Button, bool, false), expect_actions: []const types.Action) !void {
     var res = try state.update(std.EnumArray(types.Button, bool).initDefault(false, new_status));
-    std.debug.print("{d}: ", .{testIdx});
+    std.debug.print("{d}: ", .{test_idx});
     for (res.slice()) |i| {
         std.debug.print("{s}, ", .{@tagName(i)});
     }
     std.debug.print("\n", .{});
-    std.debug.print("{d}___: ", .{testIdx});
-    var iterator = state.currentState.content.iterator();
+    std.debug.print("{d}___: ", .{test_idx});
+    var iterator = state.current_state.content.iterator();
     while (iterator.next()) |e| {
         if (e.value.* != .off) {
             std.debug.print("{s}:{s}, ", .{ @tagName(e.key), @tagName(e.value.*) });
@@ -288,5 +288,5 @@ fn test_step(state: *EngineState, new_status: std.enums.EnumFieldStruct(types.Bu
     }
     std.debug.print("\n", .{});
     try std.testing.expect(std.mem.eql(types.Action, res.slice(), expect_actions));
-    testIdx += 1;
+    test_idx += 1;
 }

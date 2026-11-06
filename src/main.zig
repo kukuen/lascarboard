@@ -6,56 +6,49 @@ const types = @import("types.zig");
 const engine = @import("engine.zig");
 const crg = @import("crg.zig");
 
-const HIGH = 0x1;
-const LOW = 0x0;
+var keyboard_debouncer: types.KeyboardDebouncer = undefined;
+var engine_state: engine.EngineState = undefined;
 
-const INPUT = 0x0;
-const OUTPUT = 0x1;
-const INPUT_PULLUP = 0x2;
-
-var KEYBOARD_DEBOUNCER: types.KeyboardDebouncer = undefined;
-var ENGINE_STATE: engine.EngineState = undefined;
-
-var LAST_KEY_COUNT: u8 = 0;
-var LAST_TIME: u32 = 0;
+var last_key_count: u8 = 0;
+var last_time: u32 = 0;
 
 pub export fn setup() callconv(.c) void {
     arduino.keyboardBegin();
 
-    if (config.DEBUG_SERIAL) {
+    if (config.debug_serial) {
         // hal.serialBegin(9600);
         // hal.delay(5000);
     }
-    if (config.DEBUG_LED) {
-        arduino.pinMode(13, OUTPUT);
+    if (config.debug_led) {
+        arduino.pinMode(13, arduino.OUTPUT);
     }
 
-    ENGINE_STATE = engine.EngineState.init();
-    KEYBOARD_DEBOUNCER = types.KeyboardDebouncer.init();
+    engine_state = engine.EngineState.init();
+    keyboard_debouncer = types.KeyboardDebouncer.init();
 
-    inline for (types.BUTTONS) |button| {
-        const pin = config.PIN_MAPPING.get(button);
+    inline for (types.all_buttons) |button| {
+        const pin = config.pin_mapping.get(button);
         if (pin) |p| {
-            arduino.pinMode(p, INPUT_PULLUP);
+            arduino.pinMode(p, arduino.INPUT_PULLUP);
         }
     }
 
     updateKeyboardStateRaw();
 
-    var keyboardStatus = KEYBOARD_DEBOUNCER.getKeyboardStatus();
+    var keyboard_status = keyboard_debouncer.getKeyboardStatus();
 
-    if (engine.getDownCount(keyboardStatus) >= config.KEYS_TO_WRITE_CONFIG) {
+    if (engine.getDownCount(keyboard_status) >= config.keys_to_write_config) {
         // needed because keyboard isn't recognized right away
         arduino.delay(1000);
         crg.writeConfig();
 
-        while (engine.getDownCount(keyboardStatus) > 0) {
+        while (engine.getDownCount(keyboard_status) > 0) {
             updateKeyboardStateRaw();
-            keyboardStatus = KEYBOARD_DEBOUNCER.getKeyboardStatus();
+            keyboard_status = keyboard_debouncer.getKeyboardStatus();
         }
     }
 
-    LAST_TIME = @intCast(arduino.micros());
+    last_time = @intCast(arduino.micros());
 }
 
 pub export fn loop() callconv(.c) void {
@@ -64,27 +57,27 @@ pub export fn loop() callconv(.c) void {
     const arena = frame_allocator.allocator();
 
     const now: u32 = @intCast(arduino.micros());
-    const delta: u32 = if (now < LAST_TIME) std.math.maxInt(u32) - LAST_TIME + now + 1 else now - LAST_TIME;
+    const delta: u32 = if (now < last_time) std.math.maxInt(u32) - last_time + now + 1 else now - last_time;
 
-    if (config.DEBUG_SERIAL) {
+    if (config.debug_serial) {
         var buf: [50]u8 = undefined;
         arduino.serialPrintln(std.fmt.bufPrintZ(&buf, "delta = {d}", .{delta}) catch "");
     }
 
-    LAST_TIME = now;
+    last_time = now;
 
-    inline for (types.BUTTONS) |button| {
-        const pin = config.PIN_MAPPING.get(button);
+    inline for (types.all_buttons) |button| {
+        const pin = config.pin_mapping.get(button);
         if (pin) |p| {
-            KEYBOARD_DEBOUNCER.getKey(button).update(arduino.digitalRead(p) == 0, delta);
+            keyboard_debouncer.getKey(button).update(arduino.digitalRead(p) == 0, delta);
         }
     }
 
-    const keyboardStatus = KEYBOARD_DEBOUNCER.getKeyboardStatus();
+    const keyboardStatus = keyboard_debouncer.getKeyboardStatus();
 
     const newCount = engine.getDownCount(keyboardStatus);
 
-    if (config.DEBUG_LED) {
+    if (config.debug_led) {
         arduino.digitalWrite(13, if (newCount > 0) 1 else 0);
     }
 
@@ -94,10 +87,10 @@ pub export fn loop() callconv(.c) void {
     //     hal.serialPrintln(std.fmt.bufPrintZ(&buf, "count = {d}", .{newCount}) catch "");
     // }
 
-    const actions = ENGINE_STATE.update(arena, keyboardStatus) catch return;
+    const actions = engine_state.update(arena, keyboardStatus) catch return;
 
     for (actions.items) |action| {
-        const key = config.SHORTCUTS.get(action);
+        const key = config.crg_shortcuts.get(action);
         if (key) |k| {
             arduino.keyboardPress(k.key);
             arduino.keyboardRelease(k.key);
@@ -106,10 +99,10 @@ pub export fn loop() callconv(.c) void {
 }
 
 fn updateKeyboardStateRaw() void {
-    inline for (types.BUTTONS) |button| {
-        const pin = config.PIN_MAPPING.get(button);
+    inline for (types.all_buttons) |button| {
+        const pin = config.pin_mapping.get(button);
         if (pin) |p| {
-            KEYBOARD_DEBOUNCER.getKey(button).state = arduino.digitalRead(p) == 0;
+            keyboard_debouncer.getKey(button).state = arduino.digitalRead(p) == 0;
         }
     }
 }
