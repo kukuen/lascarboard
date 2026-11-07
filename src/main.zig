@@ -52,8 +52,8 @@ pub export fn setup() callconv(.c) void {
 
 pub export fn loop() callconv(.c) void {
     const now: u32 = @intCast(arduino.micros());
-    const delta: u32 = if (now < last_time) std.math.maxInt(u32) - last_time + now + 1 else now - last_time;
-
+    // handling time wrapping with -%
+    const delta: u32 = now -% last_time;
     last_time = now;
 
     inline for (types.all_buttons) |button| {
